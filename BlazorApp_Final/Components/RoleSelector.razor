@@ -1,0 +1,42 @@
+﻿@using Microsoft.AspNetCore.Identity;
+@using System.ComponentModel.DataAnnotations;
+@using BlazorApp_Final.Data;
+@inject RoleManager<IdentityRole> RoleManager
+
+<div class="mb-3">
+    <label for="role-select" class="form-label">Role</label>
+    <select id="role-select" class="form-select" @bind="SelectedRole">
+        @foreach (var role in Roles)
+        {
+            <option value="@role.Name">@role.Name</option>
+        }
+    </select>
+</div>
+
+@code {
+    private List<IdentityRole> Roles { get; set; } = new();
+
+    [Parameter]
+    public string SelectedRole { get; set; } = "User";
+
+    [Parameter]
+    public EventCallback<string> SelectedRoleChanged { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Roles = RoleManager.Roles.ToList();
+
+        // If there are no roles, add defaults
+        if (!Roles.Any())
+        {
+            Roles.Add(new IdentityRole { Name = "User", NormalizedName = "USER" });
+            Roles.Add(new IdentityRole { Name = "Admin", NormalizedName = "ADMIN" });
+        }
+    }
+
+    private async Task OnSelectedRoleChanged(ChangeEventArgs e)
+    {
+        SelectedRole = e.Value?.ToString() ?? "User";
+        await SelectedRoleChanged.InvokeAsync(SelectedRole);
+    }
+}

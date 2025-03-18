@@ -1,8 +1,9 @@
 ﻿@page "/Account/Register"
-
+@attribute [AllowAnonymous]
 @using System.ComponentModel.DataAnnotations
 @using System.Text
 @using System.Text.Encodings.Web
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 @using BlazorApp_Final.Data
@@ -14,6 +15,7 @@
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject RoleManager<IdentityRole> RoleManager
 
 <PageTitle>Register</PageTitle>
 
@@ -42,6 +44,19 @@
                 <label for="confirm-password">Confirm Password</label>
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
             </div>
+
+            <!-- Role Selection Dropdown -->
+            <div class="form-floating mb-3">
+                <InputSelect @bind-Value="Input.Role" class="form-select" aria-required="true">
+                    @foreach (var role in Roles)
+                    {
+                        <option value="@role.Name">@role.Name</option>
+                    }
+                </InputSelect>
+                <label for="role">User Role</label>
+                <ValidationMessage For="() => Input.Role" class="text-danger" />
+            </div>
+
             <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
         </EditForm>
     </div>
@@ -56,6 +71,7 @@
 
 @code {
     private IEnumerable<IdentityError>? identityErrors;
+    private List<IdentityRole> Roles { get; set; } = new();
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
@@ -64,6 +80,22 @@
     private string? ReturnUrl { get; set; }
 
     private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get all available roles from the database
+        Roles = RoleManager.Roles.ToList();
+
+        // If no roles are defined in the database, use defaults
+        if (!Roles.Any())
+        {
+            Roles = new List<IdentityRole>
+            {
+                new IdentityRole { Name = "User", NormalizedName = "USER" },
+                new IdentityRole { Name = "Admin", NormalizedName = "ADMIN" }
+            };
+        }
+    }
 
     public async Task RegisterUser(EditContext editContext)
     {
@@ -81,6 +113,10 @@
         }
 
         Logger.LogInformation("User created a new account with password.");
+
+        // Assign the selected role to the user
+        await UserManager.AddToRoleAsync(user, Input.Role);
+        Logger.LogInformation("User assigned to role: {Role}", Input.Role);
 
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
@@ -141,5 +177,9 @@
         [Display(Name = "Confirm password")]
         [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
         public string ConfirmPassword { get; set; } = "";
+
+        [Required]
+        [Display(Name = "Role")]
+        public string Role { get; set; } = "User";
     }
 }
